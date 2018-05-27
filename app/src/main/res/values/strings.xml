@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Emojifoto</string>
+    <string name="face_api">a402ff3bacb24342a86f69961190464f</string>
+    <string name="process_btn">Process</string>
+    <string name="browse_btn">Browse</string>
+    <string name="share_btn">Share</string>
+    <string name="capture_btn">Take Photo</string>
+
+    <string name="facebook_app_id">1519757474997626</string>
+
+    //colors
+    <color name="accent">#E53935</color>
+    <color name="main">#FDD835</color>
+
+</resources>
