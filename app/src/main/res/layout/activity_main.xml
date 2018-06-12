@@ -25,7 +25,8 @@
         android:layout_width="110dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="45dp"
-        android:text="@string/capture_btn"
+        android:text="Take Photo"
+        android:drawableLeft="@drawable/baseline_camera_24"
         android:layout_marginStart="10dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -40,6 +41,7 @@
         android:layout_marginBottom="0dp"
         android:layout_marginStart="10dp"
         android:text="@string/browse_btn"
+        android:drawableLeft="@drawable/baseline_add_photo_alternate_24"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/image"
@@ -51,57 +53,27 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
-        android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:text="@string/process_btn"
+        android:drawableLeft="@drawable/baseline_insert_emoticon_24"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@+id/fb_share_button"
         app:layout_constraintStart_toEndOf="@+id/btn_browse"
         app:layout_constraintTop_toBottomOf="@id/image"
         app:layout_constraintVertical_bias="1.0" />
-<!--
+
     <Button
         android:id="@+id/btn_share"
+        android:backgroundTint="@color/main"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
-        android:layout_marginEnd="30dp"
-        android:layout_marginStart="200dp"
+        android:layout_marginStart="8dp"
         android:text="@string/com_facebook_share_button_text"
+        android:drawableLeft="@drawable/baseline_share_24"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/image"
-        app:layout_constraintVertical_bias="1" /> -->
-
-    <com.facebook.share.widget.ShareButton
-        android:id="@+id/fb_share_button"
-        android:layout_width="77dp"
-        android:layout_height="36dp"
-        android:layout_marginBottom="21dp"
-        android:layout_marginEnd="30dp"
-        android:layout_marginStart="200dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/image"
-        app:layout_constraintVertical_bias="1"
-        />
-
-    <Button
-        android:id="@+id/btn_twitter_share"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="64dp"
-        android:layout_marginEnd="30dp"
-        android:layout_marginStart="200dp"
-        android:text="tweet"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/btn_process"
         app:layout_constraintTop_toBottomOf="@id/image"
         app:layout_constraintVertical_bias="1" />
-
-
 
 </android.support.constraint.ConstraintLayout>

@@ -1,9 +1,9 @@
 package me.ianterry.face;
 
-import android.app.ActionBar;
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -15,34 +15,27 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.constraint.ConstraintLayout;
 import android.support.constraint.ConstraintSet;
-import android.support.constraint.Constraints;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ListAdapter;
 import android.widget.Toast;
 
 import com.facebook.share.model.SharePhoto;
 import com.facebook.share.model.SharePhotoContent;
-import com.facebook.share.widget.ShareButton;
+import com.facebook.share.widget.ShareDialog;
 import com.microsoft.projectoxford.face.*;
 import com.microsoft.projectoxford.face.contract.*;
-import com.twitter.sdk.android.core.Callback;
 import com.twitter.sdk.android.core.DefaultLogger;
-import com.twitter.sdk.android.core.Result;
 import com.twitter.sdk.android.core.Twitter;
 import com.twitter.sdk.android.core.TwitterAuthConfig;
 import com.twitter.sdk.android.core.TwitterConfig;
-import com.twitter.sdk.android.core.TwitterCore;
-import com.twitter.sdk.android.core.TwitterException;
-import com.twitter.sdk.android.core.TwitterSession;
 import com.twitter.sdk.android.core.identity.TwitterAuthClient;
-import com.twitter.sdk.android.tweetcomposer.ComposerActivity;
+import com.twitter.sdk.android.tweetcomposer.TweetComposer;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -51,31 +44,32 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
-import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
 
+    //for MS Face API
     private static FaceServiceClient faceServiceClient =
             new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "4fd49bdfb85c47f9b26abfebb03feb82");
 
-    private static final String KEY_BITMAP = "bitmap";
     private static final String KEY_URI = "uri";
+    private static final String KEY_CONTENT_URI = "content_uri";
     private static final String KEY_SHARE_BOOL = "share_bool";
 
+    private final String[] shareChoices = {"Facebook", "Twitter"};
+    private final Integer[] shareIcons = {R.drawable.flogo_rgb_hex_24, R.drawable.twitter_social_icon_rounded_square_color_24};
+
     private ImageView mImageView;
-    //private Button mShareButton;
     public final String TAG = "attributeMethod"; //just for debugging
     private final int PICK_IMAGE = 1;
     static final int REQUEST_TAKE_PHOTO = 2;
     private static ProgressDialog progress;
     private Bitmap mBitmap;
     private Uri photoURI;
+    private Uri mContentURI;
     private boolean isShareAvail = false;
-
-    private TwitterAuthClient client;
-
+    private static Button mShareButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,8 +78,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (savedInstanceState != null)
         {
-            //mBitmap = savedInstanceState.getParcelable(KEY_BITMAP);
             photoURI = savedInstanceState.getParcelable(KEY_URI);
+            mContentURI = savedInstanceState.getParcelable(KEY_CONTENT_URI);
             isShareAvail = savedInstanceState.getBoolean(KEY_SHARE_BOOL);
 
             try
@@ -102,24 +96,9 @@ public class MainActivity extends AppCompatActivity {
 
             if (mBitmap != null)
             {
-                mImageView = (ImageView) findViewById(R.id.image);
+                mImageView = findViewById(R.id.image);
                 mImageView.setImageBitmap(mBitmap);
             }
-
-            if (isShareAvail)
-            {
-                //stuff for the facebook share button
-                SharePhoto photo = new SharePhoto.Builder()
-                        .setBitmap(mBitmap)
-                        .build();
-                SharePhotoContent content = new SharePhotoContent.Builder()
-                        .addPhoto(photo)
-                        .build();
-                ShareButton shareButton = (ShareButton) findViewById(R.id.fb_share_button);
-                shareButton.setShareContent(content);
-            }
-
-
         }
 
         TwitterConfig config = new TwitterConfig.Builder(this)
@@ -129,15 +108,15 @@ public class MainActivity extends AppCompatActivity {
                 .build();
         Twitter.initialize(config);
 
-        Button mCaptureButton;
+        final Button mCaptureButton;
         Button mProcessButton;
         Button mBrowseButton;
-        Button mTwitterShareButton;
 
         mBrowseButton = findViewById(R.id.btn_browse);
         mBrowseButton.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view){
+                //This stuff allows user to select image from device storage
                 Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
                 galleryIntent.setType("image/*");
                 startActivityForResult(Intent.createChooser(galleryIntent, "Select Picture"), PICK_IMAGE);
@@ -159,76 +138,18 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if (mBitmap != null)
                 {
-                    detectAndFrame(mBitmap);
+                    detectAndPaintEmoji(mBitmap);
+                }
+                else if (mBitmap == null)
+                {
+                    Toast.makeText(MainActivity.this, "No image to process", Toast.LENGTH_SHORT).show();
                 }
             }
         });
 
-        mTwitterShareButton = findViewById(R.id.btn_twitter_share);
-        mTwitterShareButton.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View view){
-                final TwitterSession session = TwitterCore.getInstance().getSessionManager()
-                        .getActiveSession();
-                if (session != null)
-                {
-                    final Intent intent = new ComposerActivity.Builder(MainActivity.this)
-                            .session(session)
-                            .image(photoURI)
-                            .text("Test")
-                            .hashtags("#test")
-                            .createIntent();
-                    startActivity(intent);
-                }
-                else if (session == null)
-                {
-                    authenticateUser();
-                }
-
-            }
-        });
-        /*mShareButton = findViewById(R.id.btn_share);
-        mShareButton.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View view){
-
-        });*/
+        shareButtonMethod(isShareAvail);
 
         progress = new ProgressDialog(this);
-    }
-
-
-    //method to share image using Twitter Native Kit composer
-    private void shareUsingNativeComposer(TwitterSession session) {
-        Intent intent = new ComposerActivity.Builder(this)
-                .session(session)//Set the TwitterSession of the User to Tweet
-                .image(photoURI)//Attach an image to the Tweet
-                .text("This is Native Kit Composer Tweet!!")//Text to prefill in composer
-                .hashtags("#android")//Hashtags to prefill in composer
-                .createIntent();//finally create intent
-        startActivity(intent);
-    }
-
-
-
-    //method call to authenticate user
-    private void authenticateUser() {
-        client = new TwitterAuthClient();//init twitter auth client
-        client.authorize(this, new Callback<TwitterSession>() {
-            @Override
-            public void success(Result<TwitterSession> twitterSessionResult) {
-                //if user is successfully authorized start sharing image
-                Toast.makeText(MainActivity.this, "Login successful.", Toast.LENGTH_SHORT).show();
-                shareUsingNativeComposer(twitterSessionResult.data);
-            }
-
-            @Override
-            public void failure(TwitterException e) {
-                //if user failed to authorize then show toast
-                e.printStackTrace();
-                Toast.makeText(MainActivity.this, "Failed to authenticate by Twitter. Please try again.", Toast.LENGTH_SHORT).show();
-            }
-        });
     }
 
     @Override
@@ -238,18 +159,16 @@ public class MainActivity extends AppCompatActivity {
         //STUFF FOR BROWSE
         if (requestCode == PICK_IMAGE && resultCode == RESULT_OK && data != null && data.getData() != null)
         {
-            Uri uri = data.getData();
             photoURI = data.getData();
             try
             {
-                mBitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), uri);
+                mBitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), photoURI);
                 mImageView = (ImageView) findViewById(R.id.image);
                 mImageView.setImageBitmap(mBitmap);
 
                 //grey out the share button
                 isShareAvail = false;
-                ShareButton shareButton = (ShareButton) findViewById(R.id.fb_share_button);
-                shareButton.setShareContent(null);
+                shareButtonMethod(false);
             }
             catch (IOException e)
             {
@@ -266,23 +185,16 @@ public class MainActivity extends AppCompatActivity {
                 try
                 {
                     mBitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imgUri);
-                    mImageView = (ImageView) findViewById(R.id.image);
+                    mImageView = findViewById(R.id.image);
                     mImageView.setImageBitmap(mBitmap);
 
                     //grey out the share button
                     isShareAvail = false;
-                    ShareButton shareButton = (ShareButton) findViewById(R.id.fb_share_button);
-                    shareButton.setShareContent(null);
+                    shareButtonMethod(false);
                 }
-                catch(NullPointerException e)
+                catch(NullPointerException | IOException e)
                 {
-                    //Log.e(TAG, "there it is");
                     e.printStackTrace();
-                }
-                catch(IOException ioe)
-                {
-                    //Log.e(TAG, "ok io exception");
-                    ioe.printStackTrace();
                 }
             }
         }
@@ -292,12 +204,12 @@ public class MainActivity extends AppCompatActivity {
     public void onSaveInstanceState(Bundle savedInstanceState)
     {
         super.onSaveInstanceState(savedInstanceState);
-        //savedInstanceState.putParcelable(KEY_BITMAP, mBitmap);
         savedInstanceState.putParcelable(KEY_URI, photoURI);
+        savedInstanceState.putParcelable(KEY_CONTENT_URI, mContentURI);  //content URI is needed for tweet composer
         savedInstanceState.putBoolean(KEY_SHARE_BOOL, isShareAvail);
     }
 
-    private void detectAndFrame(final Bitmap myBitmap)
+    private void detectAndPaintEmoji(final Bitmap myBitmap)
     {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         myBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
@@ -306,21 +218,71 @@ public class MainActivity extends AppCompatActivity {
         new detectTask(this, myBitmap).execute(inputStream);
     }
 
+    private void shareButtonMethod(boolean bool)
+    {
+
+        mShareButton = findViewById(R.id.btn_share);
+        if (bool)
+        {
+            mShareButton.setEnabled(true);
+            mShareButton.setOnClickListener(new View.OnClickListener(){
+                @Override
+                public void onClick(View view)
+                {
+                    ListAdapter adapter = new ArrayAdapterWithIcon(MainActivity.this, shareChoices, shareIcons);
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    builder.setTitle(R.string.choose_platform)
+                            .setAdapter(adapter, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialogInterface, int i) {
+                                    if (shareChoices[i] == "Facebook")
+                                    {
+                                        SharePhoto photo = new SharePhoto.Builder()
+                                                .setBitmap(mBitmap)
+                                                .build();
+                                        SharePhotoContent content = new SharePhotoContent.Builder()
+                                                .addPhoto(photo)
+                                                .build();
+                                        ShareDialog.show(MainActivity.this, content);
+                                    }
+                                    else if (shareChoices[i] == "Twitter")
+                                    {
+                                        TweetComposer.Builder builder = new TweetComposer.Builder(MainActivity.this)
+                                                .text("Picture created with #EmojiPhoto app for Android.")
+                                                .image(mContentURI);
+                                        builder.show();
+                                    }
+                                }
+                            });
+                    builder.setNegativeButton("Cancel", null);
+                    builder.create();
+                    builder.show();
+                }
+            });
+        }
+        else if (!bool)
+        {
+            mShareButton.setEnabled(false);
+        }
+
+    }
+
     private Bitmap drawFaceRectangleOnBitmap(Bitmap myBitmap, Face[] faces)
     {
         Bitmap bitmap = myBitmap.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
-        paint.setAntiAlias(true);
+        /*paint.setAntiAlias(true);
         paint.setStyle(Paint.Style.STROKE);
         paint.setColor(Color.WHITE);
         int strokeWidth = 8;
-        paint.setStrokeWidth(strokeWidth);
+        paint.setStrokeWidth(strokeWidth);*/
         if(faces != null)
         {
-            for(Face face: faces)
+            for(Face face: faces) //for each of the faces detected
             {
-                FaceRectangle faceRectangle = face.faceRectangle;
+                FaceRectangle faceRectangle = face.faceRectangle;  //get rectangle binding face
                /* canvas.drawRect(faceRectangle.left,  //this draws the rectangle
                                 faceRectangle.top,
                                 faceRectangle.left + faceRectangle.width,
@@ -369,27 +331,13 @@ public class MainActivity extends AppCompatActivity {
                     faceBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.surprise);  //the emoji image
                 }
 
-                mFaceImageView.setImageBitmap(faceBitmap);
-
-                ConstraintLayout layout = findViewById(R.id.constraint_layout);
-                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(ConstraintLayout.LayoutParams.WRAP_CONTENT, ConstraintLayout.LayoutParams.WRAP_CONTENT);
-
-                mFaceImageView.setLayoutParams(lp);
-                ConstraintSet set = new ConstraintSet();
-                set.clone(layout);
-                set.connect(mFaceImageView.getId(), ConstraintSet.TOP, mImageView.getId(), ConstraintSet.TOP);
-                set.connect(mFaceImageView.getId(), ConstraintSet.RIGHT, mImageView.getId(), ConstraintSet.RIGHT);
-                set.connect(mFaceImageView.getId(), ConstraintSet.BOTTOM, mImageView.getId(), ConstraintSet.BOTTOM);
-                set.connect(mFaceImageView.getId(), ConstraintSet.LEFT, mImageView.getId(), ConstraintSet.LEFT);
-                set.applyTo(layout);
-
-                //this draws the emojis in the right spot
+                //this draws the emoji over the detected face
                 Bitmap scaledFace = Bitmap.createScaledBitmap(faceBitmap, faceRectangle.width + (faceRectangle.width/8), faceRectangle.height + (int)(faceRectangle.height/2f), true);  //scales the emoji size
                 canvas.drawBitmap(scaledFace, faceRectangle.left - ((faceRectangle.width/9)/2), faceRectangle.top - ((int)(faceRectangle.height/2)/2), paint);  //draws the emoji on the face
 
-                Log.d("ok", "faceRect-left: " + faceRectangle.left + " faceRect-top: " + faceRectangle.top);
+                /*Log.d("ok", "faceRect-left: " + faceRectangle.left + " faceRect-top: " + faceRectangle.top);
                 Log.d("ok", "faceRect-width: " + faceRectangle.width + " facRect-height: " + faceRectangle.height);
-                Log.d("ok", "emoji-width: " + mImageView.getLayoutParams().width + " emoji-height: " + mImageView.getLayoutParams().height);
+                Log.d("ok", "emoji-width: " + mImageView.getLayoutParams().width + " emoji-height: " + mImageView.getLayoutParams().height);*/
 
             }
         }
@@ -456,15 +404,13 @@ public class MainActivity extends AppCompatActivity {
             emotionValue = emotion.sadness;
             emotionType = "Sadness";
         }
-        else if (emotion.surprise > emotionValue)
+        if (emotion.surprise > emotionValue)
         {
             emotionValue = emotion.surprise;
             emotionType = "Surprise";
         }
         return emotionType /*+ emotionValue*/;
     }
-
-    //String mCurrentPhotoPath;
 
     private File createImageFile() throws IOException {
         // Create an image file name
@@ -477,11 +423,8 @@ public class MainActivity extends AppCompatActivity {
                 storageDir      /* directory */
         );
 
-        // Save a file: path for use with ACTION_VIEW intents
-        //mCurrentPhotoPath = image.getAbsolutePath();
         return image;
     }
-
 
     private void dispatchTakePictureIntent() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
@@ -492,13 +435,12 @@ public class MainActivity extends AppCompatActivity {
             try {
                 photoFile = createImageFile();
             } catch (IOException ex) {
-                // Error occurred while creating the File
-            //...
+                ex.printStackTrace();
             }
             // Continue only if the File was successfully created
             if (photoFile != null) {
                  photoURI = FileProvider.getUriForFile(this,
-                        "com.example.android.fileprovider",
+                        "me.ianterry.face.fileprovider",
                         photoFile);
                 takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
                 startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
@@ -509,21 +451,15 @@ public class MainActivity extends AppCompatActivity {
 
     private static class detectTask extends AsyncTask<InputStream, String, Face[]>
     {
-        //private ProgressDialog progress = new ProgressDialog(this);
-        //ProgressDialog progress;
         private WeakReference<MainActivity> activityReference;
 
         Bitmap mMyBitmap;
 
         public detectTask(MainActivity context, Bitmap myBitmap)
         {
-            activityReference = new WeakReference<MainActivity>(context);
+            activityReference = new WeakReference<>(context);
             mMyBitmap = myBitmap;
         }
-
-        //ProgressDialog progress0 = activityReference.get().progress;
-
-        //ImageView mImageView0 = activityReference.get().mImageView;
 
         @Override
         protected void onPostExecute(Face[] faces) {
@@ -541,7 +477,7 @@ public class MainActivity extends AppCompatActivity {
             mActivity.mBitmap = mActivity.drawFaceRectangleOnBitmap(mMyBitmap, faces);
             mActivity.mImageView.setImageBitmap(mActivity.mBitmap);
 
-///////////// the purpose of this next stuff is to get a URI for the Bitmap so that we can save the uri across screen rotation
+            ///////////// the purpose of this next stuff is to get a URI for the Bitmap so that we can save the uri across screen rotation
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             mActivity.mBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
             byte[] bitmapData = bytes.toByteArray();
@@ -552,8 +488,8 @@ public class MainActivity extends AppCompatActivity {
                 String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
                 String imageFileName = "JPEG_" + timeStamp + "_";
 
-                //File storageDir = mActivity.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-                File storageDir = new File(mActivity.getApplicationContext().getFilesDir(), "emojify_pic");
+                File storageDir = new File(mActivity.getApplicationContext().getFilesDir(), "emojiphoto_pic");
+                storageDir.mkdirs();
 
                 File image = File.createTempFile(
                         imageFileName,  /* prefix */
@@ -567,37 +503,19 @@ public class MainActivity extends AppCompatActivity {
                 mCurrentPhotoPath = image.getAbsolutePath();
                 Log.e("photo path", "bicycle: " + mCurrentPhotoPath);
                 mActivity.photoURI = Uri.fromFile(image);
+                mActivity.mContentURI = FileProvider.getUriForFile(mActivity.getApplicationContext(), BuildConfig.APPLICATION_ID + ".fileprovider", image);  //this is a content uri used for twitter share
             } catch (IOException ex) {
                 // Error occurred while creating the File
                 ex.printStackTrace();
             }
-            // Continue only if the File was successfully created
+            ///////////////
 
-            /*try
-            {
-                mActivity.mBitmap = MediaStore.Images.Media.getBitmap(mActivity.getContentResolver(), mActivity.photoURI);
-            }
-            catch(IOException e)
-            {
-                e.printStackTrace();
-            }*/
-
-///////////////
             //toast showing # faces detected
-            Toast toast = Toast.makeText(mActivity.getApplicationContext(), "" + faces.length + " faces detected", Toast.LENGTH_SHORT);
+            Toast toast = Toast.makeText(mActivity.getApplicationContext(), "" + faces.length + " face(s) detected", Toast.LENGTH_SHORT);
             toast.show();
 
-            //stuff for the facebook share button
-            SharePhoto photo = new SharePhoto.Builder()
-                    .setBitmap(mActivity.mBitmap)
-                    .build();
-            SharePhotoContent content = new SharePhotoContent.Builder()
-                    .addPhoto(photo)
-                    .build();
-            ShareButton shareButton = (ShareButton) mActivity.findViewById(R.id.fb_share_button);
-            shareButton.setShareContent(content);
-
             mActivity.isShareAvail = true; //this allows share button to remain usable after screen rotation
+            mActivity.shareButtonMethod(mActivity.isShareAvail);
         }
 
         @Override
@@ -615,7 +533,6 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected Face[] doInBackground(InputStream... inputStreams) {
-            //return new Face[0];
             try
             {
 
