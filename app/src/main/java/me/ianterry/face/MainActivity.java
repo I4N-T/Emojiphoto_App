@@ -273,23 +273,13 @@ public class MainActivity extends AppCompatActivity {
         Bitmap bitmap = myBitmap.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
-        /*paint.setAntiAlias(true);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setColor(Color.WHITE);
-        int strokeWidth = 8;
-        paint.setStrokeWidth(strokeWidth);*/
+
         if(faces != null)
         {
             for(Face face: faces) //for each of the faces detected
             {
                 FaceRectangle faceRectangle = face.faceRectangle;  //get rectangle binding face
-               /* canvas.drawRect(faceRectangle.left,  //this draws the rectangle
-                                faceRectangle.top,
-                                faceRectangle.left + faceRectangle.width,
-                                faceRectangle.top + faceRectangle.height,
-                                 paint);*/
 
-                //create emoji imageview
                 ImageView mFaceImageView;
                 mFaceImageView = new ImageView(getApplicationContext());
                 mFaceImageView.setId(View.generateViewId());
@@ -334,11 +324,6 @@ public class MainActivity extends AppCompatActivity {
                 //this draws the emoji over the detected face
                 Bitmap scaledFace = Bitmap.createScaledBitmap(faceBitmap, faceRectangle.width + (faceRectangle.width/8), faceRectangle.height + (int)(faceRectangle.height/2f), true);  //scales the emoji size
                 canvas.drawBitmap(scaledFace, faceRectangle.left - ((faceRectangle.width/9)/2), faceRectangle.top - ((int)(faceRectangle.height/2)/2), paint);  //draws the emoji on the face
-
-                /*Log.d("ok", "faceRect-left: " + faceRectangle.left + " faceRect-top: " + faceRectangle.top);
-                Log.d("ok", "faceRect-width: " + faceRectangle.width + " facRect-height: " + faceRectangle.height);
-                Log.d("ok", "emoji-width: " + mImageView.getLayoutParams().width + " emoji-height: " + mImageView.getLayoutParams().height);*/
-
             }
         }
         return bitmap;
@@ -500,8 +485,7 @@ public class MainActivity extends AppCompatActivity {
                 fos.write(bitmapData);
                 fos.flush();
                 fos.close();
-                mCurrentPhotoPath = image.getAbsolutePath();
-                Log.e("photo path", "bicycle: " + mCurrentPhotoPath);
+                mCurrentPhotoPath = image.getAbsolutePath();  //for debugging
                 mActivity.photoURI = Uri.fromFile(image);
                 mActivity.mContentURI = FileProvider.getUriForFile(mActivity.getApplicationContext(), BuildConfig.APPLICATION_ID + ".fileprovider", image);  //this is a content uri used for twitter share
             } catch (IOException ex) {
@@ -514,7 +498,11 @@ public class MainActivity extends AppCompatActivity {
             Toast toast = Toast.makeText(mActivity.getApplicationContext(), "" + faces.length + " face(s) detected", Toast.LENGTH_SHORT);
             toast.show();
 
-            mActivity.isShareAvail = true; //this allows share button to remain usable after screen rotation
+            if (faces.length > 0)
+            {
+                mActivity.isShareAvail = true; //this allows share button to remain usable after screen rotation
+            }
+
             mActivity.shareButtonMethod(mActivity.isShareAvail);
         }
 
