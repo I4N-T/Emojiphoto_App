@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -13,6 +14,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Telephony;
 import android.support.constraint.ConstraintLayout;
 import android.support.constraint.ConstraintSet;
 import android.support.v4.content.FileProvider;
@@ -46,6 +48,7 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -57,8 +60,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_CONTENT_URI = "content_uri";
     private static final String KEY_SHARE_BOOL = "share_bool";
 
-    private final String[] shareChoices = {"Facebook", "Twitter"};
-    private final Integer[] shareIcons = {R.drawable.flogo_rgb_hex_24, R.drawable.twitter_social_icon_rounded_square_color_24};
+    private final String[] shareChoices = {"Facebook", "Twitter", "Whatsapp", "Gmail", "SMS"};
+    private final Integer[] shareIcons = {R.drawable.flogo_rgb_hex_24,
+            R.drawable.twitter_social_icon_rounded_square_color_24,
+            R.drawable.icons8_whatsapp_24,
+            R.drawable.icons8_gmail_24,
+            R.drawable.outline_textsms_black_24dp};
 
     private ImageView mImageView;
     public final String TAG = "attributeMethod"; //just for debugging
@@ -205,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
     {
         super.onSaveInstanceState(savedInstanceState);
         savedInstanceState.putParcelable(KEY_URI, photoURI);
-        savedInstanceState.putParcelable(KEY_CONTENT_URI, mContentURI);  //content URI is needed for tweet composer
+        savedInstanceState.putParcelable(KEY_CONTENT_URI, mContentURI);  //content URI is needed for tweet composer, gmail, whatsapp, sms
         savedInstanceState.putBoolean(KEY_SHARE_BOOL, isShareAvail);
     }
 
@@ -253,6 +260,19 @@ public class MainActivity extends AppCompatActivity {
                                                 .image(mContentURI);
                                         builder.show();
                                     }
+                                    else if (shareChoices[i] == "Gmail")
+                                    {
+                                        initShareIntent("gmail");
+                                    }
+                                    else if (shareChoices[i] == "Whatsapp")
+                                    {
+                                        initShareIntent("whatsapp");
+                                    }
+                                    else if (shareChoices[i] == "SMS")
+                                    {
+                                        String defaultSmsPackageName = Telephony.Sms.getDefaultSmsPackage(MainActivity.this); //gets default sms package name
+                                        initShareIntent(defaultSmsPackageName.toLowerCase());
+                                    }
                                 }
                             });
                     builder.setNegativeButton("Cancel", null);
@@ -266,6 +286,30 @@ public class MainActivity extends AppCompatActivity {
             mShareButton.setEnabled(false);
         }
 
+    }
+
+    private void initShareIntent(String type) {
+        boolean found = false;
+        Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
+        shareIntent.setType("image/jpeg");
+
+        // gets the list of intents that can be loaded.
+        List<ResolveInfo> resInfo = getPackageManager().queryIntentActivities(shareIntent, 0);
+        if (!resInfo.isEmpty()){
+            for (ResolveInfo info : resInfo) {
+                if (info.activityInfo.packageName.toLowerCase().contains(type) ||
+                        info.activityInfo.name.toLowerCase().contains(type) ) {
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, mContentURI); // allows to share image
+                    shareIntent.setPackage(info.activityInfo.packageName);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return;
+
+            startActivity(Intent.createChooser(shareIntent, "Select"));
+        }
     }
 
     private Bitmap drawFaceRectangleOnBitmap(Bitmap myBitmap, Face[] faces)
@@ -487,7 +531,7 @@ public class MainActivity extends AppCompatActivity {
                 fos.close();
                 mCurrentPhotoPath = image.getAbsolutePath();  //for debugging
                 mActivity.photoURI = Uri.fromFile(image);
-                mActivity.mContentURI = FileProvider.getUriForFile(mActivity.getApplicationContext(), BuildConfig.APPLICATION_ID + ".fileprovider", image);  //this is a content uri used for twitter share
+                mActivity.mContentURI = FileProvider.getUriForFile(mActivity.getApplicationContext(), BuildConfig.APPLICATION_ID + ".fileprovider", image);  //this is a content uri used for twitter share and whatsapp, gmail, sms
             } catch (IOException ex) {
                 // Error occurred while creating the File
                 ex.printStackTrace();
